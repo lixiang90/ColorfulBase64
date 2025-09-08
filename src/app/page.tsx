@@ -236,7 +236,7 @@ export default function Home() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportName, setExportName] = useState('');
   const [exportDescription, setExportDescription] = useState('');
-  const [useDeflate, setUseDeflate] = useState(false);
+  const [compressionMode, setCompressionMode] = useState<'smart' | 'none'>('smart');
   const [compressionStats, setCompressionStats] = useState<{originalLength: number, compressedLength: number, ratio: number} | null>(null);
 
   // 标准Base64字符集
@@ -418,10 +418,14 @@ export default function Home() {
       }
       
       let finalResult = '';
+      let useCompression = false;
       let deflateData: DeflateResult | null = null;
       
-      if (useDeflate) {
-        // 使用DEFLATE压缩
+      // 标准Base64编码
+      const standardBase64 = btoa(unescape(encodeURIComponent(text)));
+      
+      if (compressionMode === 'smart') {
+        // 智能压缩：先尝试压缩，比较长度
         deflateData = DeflateCompression.compress(text);
         
         // 将压缩结果转换为Base64
@@ -429,14 +433,43 @@ export default function Home() {
         
         // 组合结果：标识符 + 压缩数据
         const combinedData = 'DEFLATE|' + compressedBase64;
-        const standardBase64 = btoa(unescape(encodeURIComponent(combinedData)));
+        const compressedStandardBase64 = btoa(unescape(encodeURIComponent(combinedData)));
         
-        // 更新压缩统计信息
-        setCompressionStats({
-          originalLength: deflateData.originalLength,
-          compressedLength: deflateData.compressedLength,
-          ratio: deflateData.originalLength > 0 ? ((deflateData.originalLength - deflateData.compressedLength) / deflateData.originalLength) * 100 : 0
-        });
+        // 比较压缩后和原始的长度
+        if (compressedStandardBase64.length < standardBase64.length) {
+          useCompression = true;
+          
+          // 决定是否使用分隔符
+          const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
+          
+          // 替换为自定义字符
+          for (const char of compressedStandardBase64) {
+            const index = STANDARD_BASE64.indexOf(char);
+            if (index !== -1) {
+              finalResult += customChars[index];
+            } else {
+              finalResult += char; // 保持填充字符 '='
+            }
+            
+            if (shouldUseSeparator) {
+              finalResult += separator;
+            }
+          }
+          
+          // 移除最后一个分隔符（如果使用了分隔符）
+          finalResult = shouldUseSeparator ? finalResult.slice(0, -separator.length) : finalResult;
+          
+          // 更新压缩统计信息
+          setCompressionStats({
+            originalLength: standardBase64.length,
+            compressedLength: compressedStandardBase64.length,
+            ratio: ((standardBase64.length - compressedStandardBase64.length) / standardBase64.length) * 100
+          });
+        }
+      }
+      
+      if (!useCompression) {
+        // 使用标准编码（智能压缩判断不划算或选择不压缩）
         
         // 决定是否使用分隔符
         const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
@@ -457,32 +490,23 @@ export default function Home() {
         
         // 移除最后一个分隔符（如果使用了分隔符）
         finalResult = shouldUseSeparator ? finalResult.slice(0, -separator.length) : finalResult;
-      } else {
-        // 标准Base64编码
-        const standardBase64 = btoa(unescape(encodeURIComponent(text)));
         
-        // 决定是否使用分隔符
-        const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
-        
-        // 替换为自定义字符
-        for (const char of standardBase64) {
-          const index = STANDARD_BASE64.indexOf(char);
-          if (index !== -1) {
-            finalResult += customChars[index];
-          } else {
-            finalResult += char; // 保持填充字符 '='
-          }
+        // 更新统计信息
+        if (compressionMode === 'smart' && deflateData) {
+          // 智能压缩但选择不压缩的情况
+          const compressedBase64 = DeflateCompression.arrayToBase64(deflateData.compressed);
+          const combinedData = 'DEFLATE|' + compressedBase64;
+          const compressedStandardBase64 = btoa(unescape(encodeURIComponent(combinedData)));
           
-          if (shouldUseSeparator) {
-            finalResult += separator;
-          }
+          setCompressionStats({
+            originalLength: standardBase64.length,
+            compressedLength: compressedStandardBase64.length,
+            ratio: ((standardBase64.length - compressedStandardBase64.length) / standardBase64.length) * 100
+          });
+        } else {
+          // 清除压缩统计信息
+          setCompressionStats(null);
         }
-        
-        // 移除最后一个分隔符（如果使用了分隔符）
-        finalResult = shouldUseSeparator ? finalResult.slice(0, -separator.length) : finalResult;
-        
-        // 清除压缩统计信息
-        setCompressionStats(null);
       }
       
       return finalResult;
@@ -829,32 +853,44 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* DEFLATE压缩设置 */}
+              {/* 智能压缩设置 */}
               <div className="bg-purple-50 p-4 rounded-lg space-y-3">
-                <h3 className="text-sm font-medium text-gray-700">DEFLATE压缩</h3>
+                <h3 className="text-sm font-medium text-gray-700">压缩模式</h3>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-4">
                   <label className="flex items-center">
                     <input
-                      type="checkbox"
-                      checked={useDeflate}
-                      onChange={(e) => setUseDeflate(e.target.checked)}
+                      type="radio"
+                      name="compressionMode"
+                      checked={compressionMode === 'smart'}
+                      onChange={() => setCompressionMode('smart')}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-600">启用DEFLATE压缩</span>
+                    <span className="text-sm text-gray-600">智能压缩</span>
+                  </label>
+                  
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="compressionMode"
+                      checked={compressionMode === 'none'}
+                      onChange={() => setCompressionMode('none')}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">不压缩</span>
                   </label>
                 </div>
                 
                 <div className="text-xs text-gray-500">
-                  {useDeflate ? (
-                    <span className="text-purple-600">🗜️ 将使用DEFLATE算法压缩编码长度</span>
+                  {compressionMode === 'smart' ? (
+                    <span className="text-purple-600">🧠 仅在压缩能减少长度时使用DEFLATE算法</span>
                   ) : (
-                    <span>DEFLATE压缩结合LZ77和霍夫曼编码，可以显著减少输出大小</span>
+                    <span>直接使用Base64编码，不进行压缩处理</span>
                   )}
                 </div>
                 
                 {/* 压缩统计信息 */}
-                {compressionStats && useDeflate && (
+                {compressionStats && (
                   <div className="mt-2 p-2 bg-white rounded border border-purple-200">
                     <div className="text-xs space-y-1">
                       <div className="flex justify-between">
@@ -862,12 +898,14 @@ export default function Home() {
                         <span className="font-mono">{compressionStats.originalLength} bytes</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">压缩长度:</span>
+                        <span className="text-gray-600">编码长度:</span>
                         <span className="font-mono">{compressionStats.compressedLength} bytes</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">压缩率:</span>
-                        <span className="font-mono text-purple-600">{compressionStats.ratio.toFixed(1)}%</span>
+                        <span className="text-gray-600">{compressionStats.ratio > 0 ? '压缩率:' : '增长率:'}:</span>
+                        <span className={`font-mono ${compressionStats.ratio > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {Math.abs(compressionStats.ratio).toFixed(1)}%
+                        </span>
                       </div>
                     </div>
                   </div>
