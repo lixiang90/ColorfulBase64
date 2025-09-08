@@ -133,7 +133,7 @@ export default function Home() {
       const description = lines[1].replace(/^描述[:：]\s*/, '');
       
       // 解析字符集，支持多种分隔符
-      let charsLine = lines.slice(2).join(' ');
+      const charsLine = lines.slice(2).join(' ');
       let chars: string[];
       
       // 尝试不同的分隔符
@@ -442,25 +442,7 @@ export default function Home() {
     setShowExportDialog(false);
   };
 
-  // 导出当前编码为txt文件（保留兼容性）
-  const exportCurrentEncoding = () => {
-    const encodingName = selectedPreset || '自定义编码';
-    const description = selectedPreset ? 
-      ENCODING_PRESETS[selectedPreset]?.description || '自定义编码方案' : 
-      '自定义编码方案';
-    
-    const content = `名称: ${encodingName}\n描述: ${description}\n字符: ${customChars.join(',')}`;
-    
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${encodingName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+
 
   // 导出用户编码为txt文件
   const exportUserEncoding = (encoding: { name: string; description: string; chars: string[] }) => {
