@@ -778,7 +778,7 @@ export default function Home() {
                     <p>• 第2行：编码描述（可选前缀 &quot;描述:&quot; 或 &quot;描述：&quot;）</p>
                     <p>• 第3行及以后：64个字符，支持逗号、竖线、空格分隔</p>
                     <p>• 示例文件内容：</p>
-                    <pre className="mt-2 p-2 bg-white rounded text-xs font-mono">
+                    <pre className="mt-2 p-2 bg-white rounded text-xs font-mono whitespace-pre-wrap break-all">
 名称: 我的编码{"\n"}描述: 自定义字符集{"\n"}A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,0,1,2,3,4,5,6,7,8,9,+,/
                     </pre>
                   </div>
