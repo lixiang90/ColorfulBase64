@@ -549,7 +549,7 @@ export default function Home() {
                       <p className="font-medium">⚠️ 检测到编码冲突：</p>
                       {conflicts.map((conflict, index) => (
                         <p key={index} className="mt-1">
-                          字符 "{conflict.char}" 在位置 {conflict.positions.join(', ')} 重复出现
+                          字符 &quot;{conflict.char}&quot; 在位置 {conflict.positions.join(', ')} 重复出现
                         </p>
                       ))}
                       <p className="mt-2 text-xs">请修复冲突后才能进行编解码操作</p>
