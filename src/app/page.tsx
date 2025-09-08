@@ -411,10 +411,10 @@ export default function Home() {
   // 处理导出对话框的打开
   const handleExportDialog = () => {
     const defaultName = selectedPreset ? 
-      (ENCODING_PRESETS[selectedPreset]?.name || selectedPreset) : 
+      (ENCODING_PRESETS[selectedPreset as keyof typeof ENCODING_PRESETS]?.name || selectedPreset) : 
       '自定义编码';
     const defaultDescription = selectedPreset ? 
-      (ENCODING_PRESETS[selectedPreset]?.description || '自定义编码方案') : 
+      (ENCODING_PRESETS[selectedPreset as keyof typeof ENCODING_PRESETS]?.description || '自定义编码方案') : 
       '自定义编码方案';
     
     setExportName(defaultName);
