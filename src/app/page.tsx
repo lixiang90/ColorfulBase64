@@ -246,6 +246,22 @@ export default function Home() {
     return false;
   };
 
+  // 检查分隔符是否与自定义字符冲突
+  const hasSeparatorConflict = () => {
+    if (!separator || separator.trim() === '') {
+      return false;
+    }
+    
+    // 检查分隔符是否与任何自定义字符相同或包含关系
+    for (const char of customChars) {
+      if (char && (char === separator || char.includes(separator) || separator.includes(char))) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   // 编码函数
   const encode = (text: string) => {
     try {
@@ -254,6 +270,11 @@ export default function Home() {
       if (conflicts.length > 0) {
         const firstConflict = conflicts[0];
         return `编码冲突：字符 "${firstConflict.char}" 在位置 ${firstConflict.positions.join(', ')} 重复出现，请修复冲突后重试`;
+      }
+      
+      // 检查分隔符冲突
+      if (useSeparator && hasSeparatorConflict()) {
+        return '分隔符冲突：分隔符与编码字符存在冲突，请更换分隔符后重试';
       }
       
       // 将文本转换为标准Base64
@@ -292,6 +313,11 @@ export default function Home() {
       if (conflicts.length > 0) {
         const firstConflict = conflicts[0];
         return `编码冲突：字符 "${firstConflict.char}" 在位置 ${firstConflict.positions.join(', ')} 重复出现，请修复冲突后重试`;
+      }
+      
+      // 检查分隔符冲突（仅在使用分隔符时）
+      if (encodedText.includes(separator) && hasSeparatorConflict()) {
+        return '分隔符冲突：分隔符与编码字符存在冲突，请更换分隔符后重试';
       }
       
       let parts: string[];
@@ -587,7 +613,11 @@ export default function Home() {
                     )
                   ) : (
                     useSeparator ? (
-                      <span>将使用 &quot;{separator}&quot; 作为分隔符</span>
+                      hasSeparatorConflict() ? (
+                        <span className="text-red-600">❌ 分隔符与编码字符冲突，请更换分隔符</span>
+                      ) : (
+                        <span>将使用 &quot;{separator}&quot; 作为分隔符</span>
+                      )
                     ) : (
                       <span className="text-orange-600">⚠️ 不使用分隔符可能导致解码错误</span>
                     )
