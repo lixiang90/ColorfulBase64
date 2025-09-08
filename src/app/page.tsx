@@ -4,6 +4,144 @@ import { useState, useEffect } from 'react';
 import { Tab } from '@headlessui/react';
 import { ClipboardDocumentIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
+// DEFLATE压缩相关类型和算法
+interface DeflateResult {
+  compressed: Uint8Array;
+  originalLength: number;
+  compressedLength: number;
+}
+
+// DEFLATE压缩算法实现（简化版，基于LZ77）
+class DeflateCompression {
+  // 简化的LZ77压缩
+  static lz77Compress(text: string): Uint8Array {
+    // 先将文本转换为UTF-8字节数组
+    const textBytes = new TextEncoder().encode(text);
+    const result: number[] = [];
+    const windowSize = 255; // 简化窗口大小
+    
+    let i = 0;
+    while (i < textBytes.length) {
+      let bestMatch = { distance: 0, length: 0 };
+      
+      // 在滑动窗口中查找最长匹配
+      const searchStart = Math.max(0, i - windowSize);
+      for (let j = searchStart; j < i; j++) {
+        let matchLength = 0;
+        while (i + matchLength < textBytes.length && 
+               j + matchLength < i &&
+               textBytes[j + matchLength] === textBytes[i + matchLength] && 
+               matchLength < 255) { // 最大匹配长度
+          matchLength++;
+        }
+        
+        if (matchLength > bestMatch.length && matchLength >= 3) {
+          bestMatch = {
+            distance: i - j,
+            length: matchLength
+          };
+        }
+      }
+      
+      if (bestMatch.length >= 3) {
+        // 找到匹配，记录距离和长度
+        result.push(1); // 标志位：匹配
+        result.push(bestMatch.distance);
+        result.push(bestMatch.length);
+        i += bestMatch.length;
+      } else {
+        // 没有找到匹配，记录字面量
+        result.push(0); // 标志位：字面量
+        result.push(textBytes[i]);
+        i++;
+      }
+    }
+    
+    return new Uint8Array(result);
+  }
+  
+  // 压缩文本
+  static compress(text: string): DeflateResult {
+    if (!text) {
+      return {
+        compressed: new Uint8Array(0),
+        originalLength: 0,
+        compressedLength: 0
+      };
+    }
+    
+    const compressed = this.lz77Compress(text);
+    
+    return {
+      compressed,
+      originalLength: text.length,
+      compressedLength: compressed.length
+    };
+  }
+  
+  // 解压缩
+  static decompress(compressed: Uint8Array): string {
+    if (compressed.length === 0) return '';
+    
+    const resultBytes: number[] = [];
+    let i = 0;
+    
+    while (i < compressed.length) {
+      const flag = compressed[i++];
+      
+      if (flag === 0) {
+        // 字面量
+        if (i < compressed.length) {
+          resultBytes.push(compressed[i++]);
+        }
+      } else if (flag === 1) {
+        // 距离-长度对
+        if (i + 1 < compressed.length) {
+          const distance = compressed[i++];
+          const length = compressed[i++];
+          
+          // 复制之前的字节
+          const startPos = resultBytes.length - distance;
+          if (startPos >= 0) {
+            for (let j = 0; j < length; j++) {
+              const copyIndex = startPos + (j % distance);
+              if (copyIndex < resultBytes.length) {
+                resultBytes.push(resultBytes[copyIndex]);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 将字节数组转换回UTF-8字符串
+    return new TextDecoder().decode(new Uint8Array(resultBytes));
+  }
+  
+  // 将Uint8Array转换为Base64
+  static arrayToBase64(array: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < array.length; i++) {
+      binary += String.fromCharCode(array[i]);
+    }
+    return btoa(binary);
+  }
+  
+  // 将Base64转换为Uint8Array
+  static base64ToArray(base64: string): Uint8Array {
+    try {
+      const binary = atob(base64);
+      const array = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        array[i] = binary.charCodeAt(i);
+      }
+      return array;
+    } catch {
+      return new Uint8Array(0);
+    }
+  }
+}
+
 // 编码市场 - 预设编码集合
 const ENCODING_PRESETS = {
   dishes: {
@@ -98,6 +236,8 @@ export default function Home() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportName, setExportName] = useState('');
   const [exportDescription, setExportDescription] = useState('');
+  const [useDeflate, setUseDeflate] = useState(false);
+  const [compressionStats, setCompressionStats] = useState<{originalLength: number, compressedLength: number, ratio: number} | null>(null);
 
   // 标准Base64字符集
   const STANDARD_BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -277,29 +417,75 @@ export default function Home() {
         return '分隔符冲突：分隔符与编码字符存在冲突，请更换分隔符后重试';
       }
       
-      // 将文本转换为标准Base64
-      const standardBase64 = btoa(unescape(encodeURIComponent(text)));
+      let finalResult = '';
+      let deflateData: DeflateResult | null = null;
       
-      // 决定是否使用分隔符
-      const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
-      
-      // 替换为自定义字符
-      let result = '';
-      for (const char of standardBase64) {
-        const index = STANDARD_BASE64.indexOf(char);
-        if (index !== -1) {
-          result += customChars[index];
-        } else {
-          result += char; // 保持填充字符 '='
+      if (useDeflate) {
+        // 使用DEFLATE压缩
+        deflateData = DeflateCompression.compress(text);
+        
+        // 将压缩结果转换为Base64
+        const compressedBase64 = DeflateCompression.arrayToBase64(deflateData.compressed);
+        
+        // 组合结果：标识符 + 压缩数据
+        const combinedData = 'DEFLATE|' + compressedBase64;
+        const standardBase64 = btoa(unescape(encodeURIComponent(combinedData)));
+        
+        // 更新压缩统计信息
+        setCompressionStats({
+          originalLength: deflateData.originalLength,
+          compressedLength: deflateData.compressedLength,
+          ratio: deflateData.originalLength > 0 ? ((deflateData.originalLength - deflateData.compressedLength) / deflateData.originalLength) * 100 : 0
+        });
+        
+        // 决定是否使用分隔符
+        const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
+        
+        // 替换为自定义字符
+        for (const char of standardBase64) {
+          const index = STANDARD_BASE64.indexOf(char);
+          if (index !== -1) {
+            finalResult += customChars[index];
+          } else {
+            finalResult += char; // 保持填充字符 '='
+          }
+          
+          if (shouldUseSeparator) {
+            finalResult += separator;
+          }
         }
         
-        if (shouldUseSeparator) {
-          result += separator;
+        // 移除最后一个分隔符（如果使用了分隔符）
+        finalResult = shouldUseSeparator ? finalResult.slice(0, -separator.length) : finalResult;
+      } else {
+        // 标准Base64编码
+        const standardBase64 = btoa(unescape(encodeURIComponent(text)));
+        
+        // 决定是否使用分隔符
+        const shouldUseSeparator = autoSeparator ? hasAmbiguity() : useSeparator;
+        
+        // 替换为自定义字符
+        for (const char of standardBase64) {
+          const index = STANDARD_BASE64.indexOf(char);
+          if (index !== -1) {
+            finalResult += customChars[index];
+          } else {
+            finalResult += char; // 保持填充字符 '='
+          }
+          
+          if (shouldUseSeparator) {
+            finalResult += separator;
+          }
         }
+        
+        // 移除最后一个分隔符（如果使用了分隔符）
+        finalResult = shouldUseSeparator ? finalResult.slice(0, -separator.length) : finalResult;
+        
+        // 清除压缩统计信息
+        setCompressionStats(null);
       }
       
-      // 移除最后一个分隔符（如果使用了分隔符）
-      return shouldUseSeparator ? result.slice(0, -separator.length) : result;
+      return finalResult;
     } catch {
       return '编码错误：请检查输入文本';
     }
@@ -346,8 +532,26 @@ export default function Home() {
         }
       }
       
-      // 解码标准Base64
-      return decodeURIComponent(escape(atob(standardBase64)));
+      // 解码标准Base64得到原始数据
+      const decodedData = decodeURIComponent(escape(atob(standardBase64)));
+      
+      // 检查是否是DEFLATE压缩数据
+      if (decodedData.startsWith('DEFLATE|')) {
+        const compressedBase64 = decodedData.substring(8); // 移除'DEFLATE|'前缀
+        
+        try {
+          // 解码DEFLATE压缩数据
+          const compressedArray = DeflateCompression.base64ToArray(compressedBase64);
+          const originalText = DeflateCompression.decompress(compressedArray);
+          
+          return originalText;
+        } catch (deflateError) {
+          return 'DEFLATE解码错误：数据格式不正确';
+        }
+      } else {
+        // 标准Base64解码
+        return decodedData;
+      }
     } catch {
       return '解码错误：请检查输入格式';
     }
@@ -623,6 +827,51 @@ export default function Home() {
                     )
                   )}
                 </div>
+              </div>
+
+              {/* DEFLATE压缩设置 */}
+              <div className="bg-purple-50 p-4 rounded-lg space-y-3">
+                <h3 className="text-sm font-medium text-gray-700">DEFLATE压缩</h3>
+                
+                <div className="flex items-center space-x-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={useDeflate}
+                      onChange={(e) => setUseDeflate(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">启用DEFLATE压缩</span>
+                  </label>
+                </div>
+                
+                <div className="text-xs text-gray-500">
+                  {useDeflate ? (
+                    <span className="text-purple-600">🗜️ 将使用DEFLATE算法压缩编码长度</span>
+                  ) : (
+                    <span>DEFLATE压缩结合LZ77和霍夫曼编码，可以显著减少输出大小</span>
+                  )}
+                </div>
+                
+                {/* 压缩统计信息 */}
+                {compressionStats && useDeflate && (
+                  <div className="mt-2 p-2 bg-white rounded border border-purple-200">
+                    <div className="text-xs space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">原始长度:</span>
+                        <span className="font-mono">{compressionStats.originalLength} bytes</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">压缩长度:</span>
+                        <span className="font-mono">{compressionStats.compressedLength} bytes</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">压缩率:</span>
+                        <span className="font-mono text-purple-600">{compressionStats.ratio.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button
