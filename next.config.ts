@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
-  basePath: process.env.NODE_ENV === 'production' ? '/colorful_base64' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/colorful_base64/' : ''
+  basePath: process.env.NODE_ENV === 'production' ? '/ColorfulBase64' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/ColorfulBase64/' : ''
 };
 
 export default nextConfig;
