@@ -131,7 +131,7 @@ export default function Home() {
       
       // 替换为自定义字符
       let result = '';
-      for (let char of standardBase64) {
+      for (const char of standardBase64) {
         const index = STANDARD_BASE64.indexOf(char);
         if (index !== -1) {
           result += customChars[index];
@@ -146,7 +146,7 @@ export default function Home() {
       
       // 移除最后一个分隔符（如果使用了分隔符）
       return shouldUseSeparator ? result.slice(0, -separator.length) : result;
-    } catch (error) {
+    } catch {
       return '编码错误：请检查输入文本';
     }
   };
@@ -167,7 +167,7 @@ export default function Home() {
       
       // 将自定义字符转换回标准Base64
       let standardBase64 = '';
-      for (let part of parts) {
+      for (const part of parts) {
         if (part === '=') {
           standardBase64 += '=';
         } else {
@@ -175,14 +175,14 @@ export default function Home() {
           if (index !== -1) {
             standardBase64 += STANDARD_BASE64[index];
           } else {
-            throw new Error('未知字符: ' + part);
+            throw new Error(`未知字符: ${part}`);
           }
         }
       }
       
       // 解码标准Base64
       return decodeURIComponent(escape(atob(standardBase64)));
-    } catch (error) {
+    } catch {
       return '解码错误：请检查输入格式';
     }
   };
@@ -215,7 +215,7 @@ export default function Home() {
       }
       
       if (!found) {
-        throw new Error('无法解析字符: ' + text.substring(i));
+        throw new Error(`无法解析字符: ${text.substring(i)}`);
       }
     }
     
@@ -253,8 +253,8 @@ export default function Home() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-    } catch (error) {
-      console.error('复制失败:', error);
+    } catch {
+      console.error('复制失败');
     }
   };
 
@@ -386,7 +386,7 @@ export default function Home() {
                     )
                   ) : (
                     useSeparator ? (
-                      <span>将使用 "{separator}" 作为分隔符</span>
+                      <span>将使用 &quot;{separator}&quot; 作为分隔符</span>
                     ) : (
                       <span className="text-orange-600">⚠️ 不使用分隔符可能导致解码错误</span>
                     )
