@@ -98,6 +98,32 @@ export default function Home() {
   // 标准Base64字符集
   const STANDARD_BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+  // 检查编码冲突（重复字符）
+  const checkConflicts = () => {
+    const conflicts: { char: string; positions: number[] }[] = [];
+    const charMap = new Map<string, number[]>();
+    
+    // 统计每个字符出现的位置
+    customChars.forEach((char, index) => {
+      if (char.trim() !== '') {
+        if (charMap.has(char)) {
+          charMap.get(char)!.push(index);
+        } else {
+          charMap.set(char, [index]);
+        }
+      }
+    });
+    
+    // 找出重复的字符
+    charMap.forEach((positions, char) => {
+      if (positions.length > 1) {
+        conflicts.push({ char, positions });
+      }
+    });
+    
+    return conflicts;
+  };
+
   // 检测是否存在歧义（字符重复或包含关系）
   const hasAmbiguity = () => {
     const chars = [...customChars, '='];
@@ -123,6 +149,13 @@ export default function Home() {
   // 编码函数
   const encode = (text: string) => {
     try {
+      // 检查编码冲突
+      const conflicts = checkConflicts();
+      if (conflicts.length > 0) {
+        const firstConflict = conflicts[0];
+        return `编码冲突：字符 "${firstConflict.char}" 在位置 ${firstConflict.positions.join(', ')} 重复出现，请修复冲突后重试`;
+      }
+      
       // 将文本转换为标准Base64
       const standardBase64 = btoa(unescape(encodeURIComponent(text)));
       
@@ -154,6 +187,13 @@ export default function Home() {
   // 解码函数
   const decode = (encodedText: string) => {
     try {
+      // 检查编码冲突
+      const conflicts = checkConflicts();
+      if (conflicts.length > 0) {
+        const firstConflict = conflicts[0];
+        return `编码冲突：字符 "${firstConflict.char}" 在位置 ${firstConflict.positions.join(', ')} 重复出现，请修复冲突后重试`;
+      }
+      
       let parts: string[];
       
       // 检测是否包含分隔符
@@ -500,8 +540,29 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="mt-4 text-xs text-gray-500">
-              <p>提示：每个字符应该是唯一的，以确保编码解码的准确性。</p>
+            <div className="mt-4 text-xs">
+              {(() => {
+                const conflicts = checkConflicts();
+                if (conflicts.length > 0) {
+                  return (
+                    <div className="text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                      <p className="font-medium">⚠️ 检测到编码冲突：</p>
+                      {conflicts.map((conflict, index) => (
+                        <p key={index} className="mt-1">
+                          字符 "{conflict.char}" 在位置 {conflict.positions.join(', ')} 重复出现
+                        </p>
+                      ))}
+                      <p className="mt-2 text-xs">请修复冲突后才能进行编解码操作</p>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="text-green-600 bg-green-50 p-2 rounded border border-green-200">
+                      <p>✅ 字符集无冲突，可以正常编解码</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
         </div>
