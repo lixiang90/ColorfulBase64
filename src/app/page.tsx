@@ -774,8 +774,8 @@ export default function Home() {
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <h5 className="font-medium text-blue-900 mb-2">📄 文件格式说明</h5>
                   <div className="text-sm text-blue-800 space-y-1">
-                    <p>• 第1行：编码名称（可选前缀 "名称:" 或 "名称："）</p>
-                    <p>• 第2行：编码描述（可选前缀 "描述:" 或 "描述："）</p>
+                    <p>• 第1行：编码名称（可选前缀 &quot;名称:&quot; 或 &quot;名称：&quot;）</p>
+                    <p>• 第2行：编码描述（可选前缀 &quot;描述:&quot; 或 &quot;描述：&quot;）</p>
                     <p>• 第3行及以后：64个字符，支持逗号、竖线、空格分隔</p>
                     <p>• 示例文件内容：</p>
                     <pre className="mt-2 p-2 bg-white rounded text-xs font-mono">
