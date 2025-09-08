@@ -133,7 +133,7 @@ export default function Home() {
       const description = lines[1].replace(/^描述[:：]\s*/, '');
       
       // 解析字符集，支持多种分隔符
-      const charsLine = lines.slice(2).join(' ');
+      const charsLine = lines.slice(2).join(' ').replace(/^字符[:：]\s*/, '');
       let chars: string[];
       
       // 尝试不同的分隔符
